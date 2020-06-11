@@ -1,7 +1,7 @@
 Draup
 =====
 
-This is Draup, a compile-time plugin registration system in C++17, using [Boost.Hana](https://boostorg.github.io/hana/). Draup is simple to use, and since everything is computed at compile time, Draup should add no runtime overhead to your program.
+This is Draup, a compile-time plugin registration system in C++17. Draup is simple to use, and since everything is computed at compile time, Draup should add no runtime overhead to your program.
 
 Usage
 -----
@@ -31,14 +31,15 @@ public:
 DRAUP_REGISTER(MyOtherPlugin);
 ```
 
+Note that the calls to `DRAUP_REGISTER` must be in the outermost namespace scope.
+
 Now, after including `plugin.hpp` somewhere, you can do this:
 
 ```c++
-auto plugins = DRAUP_GET_REGISTERED();
 
-/* The class of your plugin is available as "plugin". */
-DRAUP_FOR_EACH(plugins, {
-  std::cout << "Plugin registered: " << plugin::get_name() << std::endl;
+DRAUP_FOR_EACH([&](auto type_container) {
+	using plugin = typename decltype(type_container)::type;
+	std::cout << "Plugin registered: " << plugin::get_name() << std::endl;
 });
 ```
 
@@ -53,6 +54,5 @@ Everything is built at compile time, there are no pointers being juggled, no obj
 Requirements
 ------------
 
-Draup uses C++17 and Boost.Hana. Consequentially, you will need:
-* a fairly recent compiler (GCC 7.0 or clang 5.0 should do)
-* Boost >= 1.61
+Draup uses C++17 plus the `__COUNTER__` macro. Thus, you will need a fairly recent compiler (GCC 7.0
+or clang 5.0 should do).

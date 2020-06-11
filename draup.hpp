@@ -1,18 +1,98 @@
-//
-// Created by Lukas Barth on 24.04.18.
-//
-
 #ifndef DRAUP_DRAUP_HPP
 #define DRAUP_DRAUP_HPP
 
-#include <boost/hana.hpp>
-#include <boost/hana/assert.hpp>
-#include <boost/hana/set.hpp>
+#include <cstddef>
 #include <type_traits>
 
 namespace draup {
 
-namespace hana = boost::hana;
+template <class T>
+struct type_c
+{
+	using type = T;
+};
+
+namespace util {
+
+template <class... Contents>
+struct set
+{
+	template <class T>
+	constexpr static bool contains();
+
+	template <class NullaryFunction>
+	static void for_each(NullaryFunction f) noexcept;
+
+	template <class T>
+	using add = set<T, Contents...>;
+};
+
+template <class Content, class... Rest>
+struct set<Content, Rest...>
+{
+	template <class NullaryFunction>
+	static void
+	for_each(NullaryFunction f) noexcept
+	{
+		f(type_c<Content>{});
+		set<Rest...>::for_each(f);
+	}
+
+	template <class T>
+	constexpr static bool
+	contains()
+	{
+		if constexpr (std::is_same_v<T, Content>) {
+			return true;
+		} else {
+			return set<Rest...>::template contains<T>();
+		}
+	}
+
+	template <class T>
+	using add = set<T, Content, Rest...>;
+};
+
+template <>
+struct set<>
+{
+	template <class NullaryFunction>
+	static void
+	for_each(NullaryFunction f) noexcept
+	{
+		(void)f;
+	}
+
+	template <class T>
+	constexpr static bool
+	contains()
+	{
+		return false;
+	}
+
+	template <class T>
+	using add = set<T>;
+};
+
+template <class T>
+constexpr auto
+make_set()
+{
+	return set<T>{};
+}
+
+template <class T, class TheSet>
+constexpr auto
+set_insert()
+{
+	if constexpr (TheSet::template contains<T>()) {
+		return TheSet{};
+	} else {
+		return typename TheSet::template add<T>{};
+	}
+}
+
+} // namespace util
 
 template <class>
 struct sfinae_true : std::true_type
@@ -61,8 +141,8 @@ struct register_class
 	auto
 	operator()()
 	{
-		return hana::insert(registry_hook<myN - 1>{}(),
-		                    hana::type_c<ClassToRegister>);
+		return util::set_insert<ClassToRegister,
+		                        typeof(registry_hook<myN - 1>{}())>();
 	}
 };
 template <class ClassToRegister>
@@ -73,7 +153,7 @@ struct register_class<ClassToRegister, 0>
 	auto
 	operator()()
 	{
-		return hana::make<hana::set_tag>(hana::type_c<ClassToRegister>);
+		return util::make_set<ClassToRegister>();
 	}
 };
 
@@ -86,13 +166,37 @@ struct plugin_getter
 	auto
 	operator()()
 	{
-		constexpr unsigned int max_N = get_free_N<T>() - 1;
+		constexpr unsigned int next_N = get_free_N<T>();
+		if constexpr (next_N == 0) {
+			return util::set<>{};
+		} else {
+			// get the set of registered classes
+			auto registered_classes = registry_hook<next_N - 1>{}();
 
-		// get the set of registered classes
-		auto registered_classes = registry_hook<max_N>{}();
-
-		return registered_classes;
+			return registered_classes;
+		}
 	}
+};
+
+/*
+ * A struct + variable template to provide a callable for_each symbol.
+ */
+
+template <class Dummy>
+struct for_each
+{
+	template <class NullaryFunction>
+	void
+	operator()(NullaryFunction f)
+	{
+		using TheSet = typeof(plugin_getter<Dummy>{}());
+		TheSet::for_each(f);
+	}
+};
+
+template <std::size_t>
+struct DraupDummy
+{
 };
 
 } // namespace draup
@@ -118,10 +222,7 @@ struct plugin_getter
 #define DRAUP_GET_REGISTERED()                                                 \
 	::draup::plugin_getter<::draup::GetterDummyClass>{}()
 
-#define DRAUP_FOR_EACH(plugins, body)                                          \
-	boost::hana::for_each(plugins, [&](auto plugin_cls) {                        \
-		using plugin = typename decltype(plugin_cls)::type;                        \
-		body;                                                                      \
-	});
+#define DRAUP_FOR_EACH(f)                                                      \
+	::draup::for_each<::draup::DraupDummy<__COUNTER__>>{}(f)
 
 #endif // DRAUP_DRAUP_HPP

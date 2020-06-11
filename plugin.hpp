@@ -1,7 +1,3 @@
-//
-// Created by Lukas Barth on 24.04.18.
-//
-
 #ifndef DRAUP_PLUGIN_HPP
 #define DRAUP_PLUGIN_HPP
 
@@ -9,7 +5,9 @@
 
 class MyPlugin {
 public:
-	static const char * get_name() {
+	static const char *
+	get_name() noexcept
+	{
 		return "MyPlugin";
 	}
 };
@@ -18,11 +16,13 @@ DRAUP_REGISTER(MyPlugin);
 
 class MyOtherPlugin {
 public:
-	static const char * get_name() {
+	static const char *
+	get_name() noexcept
+	{
 		return "MyOtherPlugin";
 	}
 };
 
 DRAUP_REGISTER(MyOtherPlugin);
 
-#endif //DRAUP_PLUGIN_HPP
+#endif // DRAUP_PLUGIN_HPP
